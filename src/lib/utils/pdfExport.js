@@ -3,64 +3,86 @@
  */
 
 /**
- * Triggers a direct browser file download for a given Blob or string content
- * @param {Blob|string} content 
- * @param {string} fileName 
- * @param {string} mimeType 
+ * Dynamically loads html2pdf bundle from CDN to compile authentic binary PDF
+ * @returns {Promise<any>}
  */
-export function triggerFileDownload(content, fileName, mimeType = "application/pdf") {
-  if (typeof window === "undefined") return;
+async function loadHtml2PdfLibrary() {
+  if (typeof window === "undefined") return null;
+  if (window.html2pdf) return window.html2pdf;
 
-  const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
-  const downloadUrl = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = downloadUrl;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 2000);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-lib="html2pdf"]');
+    if (existing) {
+      if (window.html2pdf) {
+        resolve(window.html2pdf);
+      } else {
+        existing.addEventListener("load", () => resolve(window.html2pdf));
+        existing.addEventListener("error", reject);
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.setAttribute("data-lib", "html2pdf");
+    script.async = true;
+    script.onload = () => {
+      if (window.html2pdf) {
+        resolve(window.html2pdf);
+      } else {
+        reject(new Error("html2pdf library loaded but not available on window"));
+      }
+    };
+    script.onerror = () => reject(new Error("Failed to load html2pdf from CDN"));
+    document.head.appendChild(script);
+  });
 }
 
 /**
- * Generates a self-contained printable report document and triggers direct download
+ * Generates an authentic binary PDF document and downloads it directly to device
  * @param {object} submission 
  * @param {string} elementId 
+ * @returns {Promise<boolean>}
  */
-export function directDownloadReportDocument(submission, elementId = "printable-report-content") {
-  if (typeof window === "undefined") return;
+export async function directDownloadReportDocument(submission, elementId = "printable-report-content") {
+  if (typeof window === "undefined") return false;
 
   const subId = submission?.submissionId || "REPORT";
-  const clientName = submission?.clientName || submission?.data?.fullName || "Client";
   const fileName = `JDI-Financial-Report-${subId}.pdf`;
 
+  // 1. Check if the printable report element exists in the current page
   const reportElement = document.getElementById(elementId);
-  const reportHtml = reportElement ? reportElement.outerHTML : "<div>Report content</div>";
 
-  // Create standalone document with all Tailwind & Print styling
-  const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>JDI Wealth Financial Report - ${subId}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @page { size: A4; margin: 10mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #0f172a; margin: 0; padding: 20px; }
-    @media print {
-      body { padding: 0; }
-      .print\\:break-before-page { page-break-before: always; }
-      .print\\:min-h-screen { min-height: 100vh; }
+  // If not on report page (e.g. clicked from Admin dashboard modal), open report page with auto-download
+  if (!reportElement) {
+    const reportUrl = `/admin/report?id=${subId}&auto=download`;
+    window.open(reportUrl, "_blank");
+    return true;
+  }
+
+  // 2. Try compiling genuine binary PDF with html2pdf (jsPDF + html2canvas)
+  try {
+    const html2pdf = await loadHtml2PdfLibrary();
+    if (html2pdf) {
+      const opt = {
+        margin: [6, 6, 6, 6],
+        filename: fileName,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      };
+
+      await html2pdf().set(opt).from(reportElement).save();
+      return true;
     }
-  </style>
-</head>
-<body>
-  ${reportHtml}
-</body>
-</html>`;
+  } catch (err) {
+    console.warn("Direct html2pdf generation failed or offline. Falling back to browser print:", err);
+  }
 
-  // Download directly as an interactive document
-  triggerFileDownload(fullHtml, fileName, "application/pdf");
+  // 3. Fallback: Native Browser Print engine (User selects "Save as PDF")
+  window.print();
+  return true;
 }
 
 /**

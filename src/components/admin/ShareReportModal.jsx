@@ -26,24 +26,29 @@ export default function ShareReportModal({
   onClose,
   onStatusChange,
 }) {
-  if (!isOpen || !submission) return null;
-
-  const clientName = submission.clientName || submission.data?.fullName || "Valued Client";
-  const rawMobile = submission.data?.mobile || submission.mobile || "";
-  const rawEmail = submission.data?.email || submission.email || "";
-  const submissionId = submission.submissionId || "REPORT";
+  const clientName = submission?.clientName || submission?.data?.fullName || "Valued Client";
+  const rawMobile = submission?.data?.mobile || submission?.mobile || "";
+  const rawEmail = submission?.data?.email || submission?.email || "";
+  const submissionId = submission?.submissionId || "REPORT";
 
   // State
   const [activeTab, setActiveTab] = useState("whatsapp"); // 'whatsapp' | 'email'
-  const [mobileNumber, setMobileNumber] = useState(rawMobile);
-  const [emailAddress, setEmailAddress] = useState(rawEmail);
-  const [whatsAppMessage, setWhatsAppMessage] = useState(() => getWhatsAppShareText(submission));
-  const [emailContent, setEmailContent] = useState(() => getEmailShareContent(submission));
+  const [mobileOverride, setMobileOverride] = useState(null);
+  const [emailOverride, setEmailOverride] = useState(null);
+  const [whatsAppMsgOverride, setWhatsAppMsgOverride] = useState(null);
+  const [emailContentOverride, setEmailContentOverride] = useState(null);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState("");
   const [sentSuccess, setSentSuccess] = useState(null); // 'whatsapp' | 'email' | null
   const [isCopied, setIsCopied] = useState(false);
+
+  const mobileNumber = mobileOverride !== null ? mobileOverride : rawMobile;
+  const emailAddress = emailOverride !== null ? emailOverride : rawEmail;
+  const whatsAppMessage = whatsAppMsgOverride !== null ? whatsAppMsgOverride : (submission ? getWhatsAppShareText(submission) : "");
+  const emailContent = emailContentOverride !== null ? emailContentOverride : (submission ? getEmailShareContent(submission) : { subject: "", body: "" });
+
+  if (!isOpen || !submission) return null;
 
   // Clean phone number for WhatsApp link
   const getCleanPhone = () => {
@@ -53,8 +58,8 @@ export default function ShareReportModal({
   };
 
   // 1. Direct PDF Download
-  const handleDownloadPdf = () => {
-    directDownloadReportDocument(submission, "printable-report-content");
+  const handleDownloadPdf = async () => {
+    await directDownloadReportDocument(submission, "printable-report-content");
   };
 
   // 2. Open WhatsApp Web / App
@@ -259,7 +264,7 @@ export default function ShareReportModal({
                   <input
                     type="text"
                     value={mobileNumber}
-                    onChange={(e) => setMobileNumber(e.target.value)}
+                    onChange={(e) => setMobileOverride(e.target.value)}
                     placeholder="Enter 10-digit mobile number"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#25D366]"
                   />
@@ -280,7 +285,7 @@ export default function ShareReportModal({
                 <textarea
                   rows={6}
                   value={whatsAppMessage}
-                  onChange={(e) => setWhatsAppMessage(e.target.value)}
+                  onChange={(e) => setWhatsAppMsgOverride(e.target.value)}
                   className="w-full p-3 border border-slate-300 rounded-lg text-xs font-sans text-slate-800 bg-slate-50/70 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#25D366]"
                 />
               </div>
@@ -321,7 +326,7 @@ export default function ShareReportModal({
                 <input
                   type="email"
                   value={emailAddress}
-                  onChange={(e) => setEmailAddress(e.target.value)}
+                  onChange={(e) => setEmailOverride(e.target.value)}
                   placeholder="customer@example.com"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
@@ -336,7 +341,10 @@ export default function ShareReportModal({
                   type="text"
                   value={emailContent.subject}
                   onChange={(e) =>
-                    setEmailContent((prev) => ({ ...prev, subject: e.target.value }))
+                    setEmailContentOverride((prev) => ({
+                      ...(prev || emailContent),
+                      subject: e.target.value,
+                    }))
                   }
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
@@ -351,7 +359,10 @@ export default function ShareReportModal({
                   rows={5}
                   value={emailContent.body}
                   onChange={(e) =>
-                    setEmailContent((prev) => ({ ...prev, body: e.target.value }))
+                    setEmailContentOverride((prev) => ({
+                      ...(prev || emailContent),
+                      body: e.target.value,
+                    }))
                   }
                   className="w-full p-3 border border-slate-300 rounded-lg text-xs font-sans text-slate-800 bg-slate-50/70 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
                 />

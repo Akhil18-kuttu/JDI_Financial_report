@@ -79,17 +79,27 @@ function ReportContent() {
     window.print();
   };
 
-  const handleDirectDownload = () => {
+  const handleDirectDownload = async () => {
     setIsDownloading(true);
     try {
       if (status === SUBMISSION_STATUSES.NEW || status === SUBMISSION_STATUSES.UNDER_REVIEW) {
         handleStatusChange(SUBMISSION_STATUSES.REPORT_READY);
       }
-      directDownloadReportDocument(submission, "printable-report-content");
+      await directDownloadReportDocument(submission, "printable-report-content");
     } finally {
       setTimeout(() => setIsDownloading(false), 1200);
     }
   };
+
+  // Auto trigger download if ?auto=download is passed
+  useEffect(() => {
+    if (!isLoading && report && searchParams.get("auto") === "download") {
+      const timer = setTimeout(() => {
+        handleDirectDownload();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, report, searchParams]);
 
   if (isLoading || !report) {
     return (
