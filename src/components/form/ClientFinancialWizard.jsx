@@ -1,57 +1,45 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Send, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react";
+import { personalInfoSchema } from "@/lib/validations/clientFormSchema";
 import {
-  clientFinancialFormSchema,
-  STEP_FIELDS,
-  WIZARD_STEPS,
-} from "@/lib/validations/clientFormSchema";
-import {
-  defaultFormValues,
-  saveDraftToStorage,
-  loadDraftFromStorage,
   submitFinancialForm,
+  loadDraftFromStorage,
+  saveDraftToStorage,
 } from "@/lib/services/formStorage";
 import { sampleClientData } from "@/lib/services/mockData";
-import {
-  calculateTotalMonthlyIncome,
-  calculateTotalMonthlyExpenses,
-  calculateSurplus,
-  calculateTotalAssets,
-  calculateTotalLiabilities,
-  calculateNetWorth,
-} from "@/lib/utils/calculations";
-
-// Step UI Components
-import StepIndicator from "./StepIndicator";
-import NavigationButtons from "./NavigationButtons";
-import StepPersonal from "./StepPersonal";
-import StepFamily from "./StepFamily";
-import StepIncome from "./StepIncome";
-import StepExpenses from "./StepExpenses";
-import StepAssets from "./StepAssets";
-import StepLiabilities from "./StepLiabilities";
-import StepInvestments from "./StepInvestments";
-import StepGoals from "./StepGoals";
-import StepRetirement from "./StepRetirement";
-import StepAdditional from "./StepAdditional";
-import StepReview from "./StepReview";
+import { calculateAgeFromDOB } from "@/lib/utils/formatters";
 import SubmissionSuccess from "./SubmissionSuccess";
 
+const defaultValues = {
+  fullName: "",
+  dob: "",
+  age: "",
+  gender: "Male",
+  mobile: "",
+  email: "",
+  occupation: "",
+  address: "",
+  city: "",
+  state: "",
+};
+
 export default function ClientFinancialWizard() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState([]);
-  const [draftSavedTime, setDraftSavedTime] = useState("");
-  const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRecord, setSubmittedRecord] = useState(null);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Initialize React Hook Form
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const form = useForm({
-    resolver: zodResolver(clientFinancialFormSchema),
-    defaultValues: defaultFormValues,
+    resolver: zodResolver(personalInfoSchema),
+    defaultValues,
     mode: "onTouched",
   });
 
@@ -60,367 +48,62 @@ export default function ClientFinancialWizard() {
     handleSubmit,
     watch,
     setValue,
-    trigger,
     reset,
     formState: { errors },
   } = form;
 
-  // Watch form values for dynamic calculations and real-time updates
-  const watchedValues = watch();
-  const incomes = watchedValues.incomes || [];
-  const expenses = watchedValues.expenses || {};
-  const assets = watchedValues.assets || [];
-  const liabilities = watchedValues.liabilities || [];
-  const investments = watchedValues.investments || [];
-  const goals = watchedValues.goals || [];
-  const familyMembers = watchedValues.familyMembers || [];
+  const dobValue = watch("dob");
 
-  // Live Calculation Engine metrics for banner & stepper
-  const financialSummary = useMemo(() => {
-    const totalIncome = calculateTotalMonthlyIncome(incomes);
-    const totalExpenses = calculateTotalMonthlyExpenses(expenses);
-    const surplus = calculateSurplus(totalIncome, totalExpenses);
-    const totalAssets = calculateTotalAssets(assets);
-    const totalLiab = calculateTotalLiabilities(liabilities);
-    const netWorth = calculateNetWorth(totalAssets, totalLiab);
+  // Auto-calculate age when date of birth is selected
+  useEffect(() => {
+    if (dobValue) {
+      const calculatedAge = calculateAgeFromDOB(dobValue);
+      if (calculatedAge !== null && calculatedAge > 0) {
+        setValue("age", calculatedAge, { shouldValidate: true });
+      }
+    }
+  }, [dobValue, setValue]);
 
-    return {
-      monthlyIncome: totalIncome,
-      monthlyExpenses: totalExpenses,
-      surplus,
-      totalAssets,
-      totalLiabilities: totalLiab,
-      netWorth,
-    };
-  }, [incomes, expenses, assets, liabilities]);
-
-  // Load draft from localStorage on initial mount
+  // Load draft if available
   useEffect(() => {
     const draft = loadDraftFromStorage();
     if (draft && draft.formData) {
-      reset(draft.formData);
-      if (draft.currentStep && draft.currentStep >= 1 && draft.currentStep <= 11) {
-        setCurrentStep(draft.currentStep);
-        // Mark all steps up to draft.currentStep - 1 as completed
-        const prevCompleted = Array.from({ length: draft.currentStep - 1 }, (_, i) => i + 1);
-        setCompletedSteps(prevCompleted);
-      }
-      if (draft.savedAt) {
-        setDraftSavedTime(new Date(draft.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      }
+      reset({
+        fullName: draft.formData.fullName || "",
+        dob: draft.formData.dob || "",
+        age: draft.formData.age || "",
+        gender: draft.formData.gender || "Male",
+        mobile: draft.formData.mobile || "",
+        email: draft.formData.email || "",
+        occupation: draft.formData.occupation || "",
+        address: draft.formData.address || "",
+        city: draft.formData.city || "",
+        state: draft.formData.state || "",
+      });
     }
   }, [reset]);
 
-  // Save draft helper
-  const handleSaveDraft = () => {
-    setIsDraftSaving(true);
-    const currentValues = form.getValues();
-    saveDraftToStorage(currentValues, currentStep);
-    setTimeout(() => {
-      setIsDraftSaving(false);
-      setDraftSavedTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-    }, 300);
+  // Quick fill sample data for fast testing
+  const handleFillSample = () => {
+    reset({
+      fullName: sampleClientData.fullName,
+      dob: sampleClientData.dob,
+      age: sampleClientData.age,
+      gender: sampleClientData.gender,
+      mobile: sampleClientData.mobile,
+      email: sampleClientData.email,
+      occupation: sampleClientData.occupation,
+      address: sampleClientData.address,
+      city: sampleClientData.city,
+      state: sampleClientData.state,
+    });
   };
 
-  // One-click mock data loader for easy testing
-  const handleFillMockData = () => {
-    reset(sampleClientData);
-    setCompletedSteps([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    saveDraftToStorage(sampleClientData, currentStep);
-    setDraftSavedTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-  };
-
-  // Next step handler with scoped step validation and green tick recording
-  const handleNext = async () => {
-    const fieldsToValidate = STEP_FIELDS[currentStep];
-    if (fieldsToValidate && fieldsToValidate.length > 0) {
-      const isValid = await trigger(fieldsToValidate);
-      if (!isValid) {
-        window.scrollTo({ top: 120, behavior: "smooth" });
-        return;
-      }
-    }
-
-    // Mark current step as completed (will show green tick)
-    setCompletedSteps((prev) => Array.from(new Set([...prev, currentStep])));
-
-    // Pre-populate retirement age from personal info age if empty
-    if (currentStep === 1) {
-      const ageVal = form.getValues("age");
-      if (ageVal && !form.getValues("currentAge")) {
-        setValue("currentAge", ageVal);
-      }
-    }
-
-    // Auto-save draft on step transition
-    const currentValues = form.getValues();
-    saveDraftToStorage(currentValues, currentStep + 1);
-
-    setCurrentStep((prev) => Math.min(11, prev + 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // Back step handler
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(1, prev - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // Jump to specific step from stepper or Review screen
-  const handleJumpToStep = (stepNumber) => {
-    setCurrentStep(stepNumber);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // Dynamic Array Handlers for Step 2: Family
-  const handleAddFamilyMember = () => {
-    const current = form.getValues("familyMembers") || [];
-    setValue(
-      "familyMembers",
-      [
-        ...current,
-        {
-          id: `fam-${Date.now()}`,
-          name: "",
-          relationship: "Spouse",
-          age: "",
-          occupation: "",
-          isDependent: true,
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveFamilyMember = (index) => {
-    const current = form.getValues("familyMembers") || [];
-    setValue(
-      "familyMembers",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateFamilyMember = (index, field, value) => {
-    const current = [...(form.getValues("familyMembers") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("familyMembers", current, { shouldDirty: true });
-    }
-  };
-
-  // Dynamic Array Handlers for Step 3: Income
-  const handleAddIncome = () => {
-    const current = form.getValues("incomes") || [];
-    setValue(
-      "incomes",
-      [
-        ...current,
-        {
-          id: `inc-${Date.now()}`,
-          type: "Salary",
-          frequency: "monthly",
-          amount: "",
-          description: "",
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveIncome = (index) => {
-    const current = form.getValues("incomes") || [];
-    if (current.length <= 1) return;
-    setValue(
-      "incomes",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateIncome = (index, field, value) => {
-    const current = [...(form.getValues("incomes") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("incomes", current, { shouldDirty: true });
-    }
-  };
-
-  // Dynamic Array Handlers for Step 5: Assets
-  const handleAddAsset = () => {
-    const current = form.getValues("assets") || [];
-    setValue(
-      "assets",
-      [
-        ...current,
-        {
-          id: `ast-${Date.now()}`,
-          type: "Savings Account",
-          institution: "",
-          currentValue: "",
-          description: "",
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveAsset = (index) => {
-    const current = form.getValues("assets") || [];
-    setValue(
-      "assets",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateAsset = (index, field, value) => {
-    const current = [...(form.getValues("assets") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("assets", current, { shouldDirty: true });
-    }
-  };
-
-  // Dynamic Array Handlers for Step 6: Liabilities
-  const handleAddLiability = () => {
-    const current = form.getValues("liabilities") || [];
-    setValue(
-      "liabilities",
-      [
-        ...current,
-        {
-          id: `lia-${Date.now()}`,
-          type: "Home Loan",
-          lender: "",
-          outstandingAmount: "",
-          emi: "",
-          interestRate: "",
-          remainingTenureMonths: "",
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveLiability = (index) => {
-    const current = form.getValues("liabilities") || [];
-    setValue(
-      "liabilities",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateLiability = (index, field, value) => {
-    const current = [...(form.getValues("liabilities") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("liabilities", current, { shouldDirty: true });
-    }
-  };
-
-  // Dynamic Array Handlers for Step 7: Investments
-  const handleAddInvestment = () => {
-    const current = form.getValues("investments") || [];
-    setValue(
-      "investments",
-      [
-        ...current,
-        {
-          id: `inv-${Date.now()}`,
-          type: "Mutual Funds",
-          name: "",
-          currentValue: "",
-          monthlySIP: "",
-          initialInvestment: "",
-          expectedReturn: 12,
-          linkedGoal: "Unallocated / Flexible",
-          maturityDate: "",
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveInvestment = (index) => {
-    const current = form.getValues("investments") || [];
-    setValue(
-      "investments",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateInvestment = (index, field, value) => {
-    const current = [...(form.getValues("investments") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("investments", current, { shouldDirty: true });
-    }
-  };
-
-  // Dynamic Array Handlers for Step 8: Goals
-  const handleAddGoalWithPreset = (preset) => {
-    const current = form.getValues("goals") || [];
-    const currentYear = new Date().getFullYear();
-    const targetYear = currentYear + (preset.category === "Retirement" ? 25 : 5);
-
-    setValue(
-      "goals",
-      [
-        ...current,
-        {
-          id: `gol-${Date.now()}`,
-          category: preset.category,
-          goalName: preset.defaultName,
-          beneficiary: "Self",
-          currentCost: preset.defaultCost || 1000000,
-          targetYear,
-          yearsRemaining: targetYear - currentYear,
-          inflationRate: preset.inflation || 6,
-          expectedReturn: preset.expReturn || 12,
-          allocatedInvestment: 0,
-          priority: "High",
-        },
-      ],
-      { shouldDirty: true }
-    );
-  };
-
-  const handleRemoveGoal = (index) => {
-    const current = form.getValues("goals") || [];
-    setValue(
-      "goals",
-      current.filter((_, i) => i !== index),
-      { shouldDirty: true }
-    );
-  };
-
-  const handleUpdateGoal = (index, field, value) => {
-    const current = [...(form.getValues("goals") || [])];
-    if (current[index]) {
-      current[index] = { ...current[index], [field]: value };
-      setValue("goals", current, { shouldDirty: true });
-    }
-  };
-
-  // Final Submission Handler (Strictly only permitted on Step 11: Review)
+  // Direct submit handler - passes data to admin dashboard & displays success
   const onSubmit = async (data) => {
-    // HARD GUARD: Never auto-submit if user is on Steps 1 to 10
-    if (currentStep < 11) {
-      handleNext();
-      return;
-    }
-
-    if (!data.confirmationAgreed) {
-      await trigger(["confirmationAgreed"]);
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 400));
       const record = submitFinancialForm(data);
       setSubmittedRecord(record);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -431,62 +114,49 @@ export default function ClientFinancialWizard() {
     }
   };
 
-  const onValidationError = (validationErrors) => {
-    console.warn("Validation errors on submit:", validationErrors);
-    const errorKeys = Object.keys(validationErrors);
-    if (errorKeys.length > 0) {
-      const firstKey = errorKeys[0];
-      let foundStep = 1;
-      for (const [stepNum, fields] of Object.entries(STEP_FIELDS)) {
-        if (fields.some((f) => firstKey.startsWith(f.split(".")[0]))) {
-          foundStep = parseInt(stepNum, 10);
-          break;
-        }
-      }
-      if (foundStep < 11 && currentStep === 11) {
-        alert(
-          `Please check Step ${foundStep} - some required fields need to be completed before submitting.`
-        );
-        handleJumpToStep(foundStep);
-      }
-    }
-  };
-
-  // Reset form to start a new submission
+  // Reset to submit another response
   const handleStartNew = () => {
     setSubmittedRecord(null);
-    setCurrentStep(1);
-    setCompletedSteps([]);
-    reset(defaultFormValues);
+    reset(defaultValues);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // If successfully submitted, show final confirmation screen
+  // Show "Form Submitted" confirmation screen once submitted
   if (submittedRecord) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
-        <StepIndicator
-          currentStep={11}
-          totalSteps={11}
-          completedSteps={Array.from({ length: 11 }, (_, i) => i + 1)}
-          onStepClick={() => {}}
-          draftSavedTime=""
-          onSaveDraft={() => {}}
-          financialSummary={financialSummary}
-        />
-        <main className="flex-1">
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+            <a
+              href="https://www.jdiwealth.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2"
+            >
+              <div className="relative h-9 w-32 sm:w-36">
+                <Image
+                  src="/jdi-logo.png"
+                  alt="JDI Wealth"
+                  fill
+                  sizes="150px"
+                  className="object-contain object-left"
+                  priority
+                />
+              </div>
+            </a>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Form Submitted</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 py-8">
           <SubmissionSuccess submission={submittedRecord} onStartNew={handleStartNew} />
         </main>
-        <footer className="py-6 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">
-          <a
-            href="https://www.jdiwealth.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline text-slate-600 font-medium"
-          >
-            JDI Wealth
-          </a>{" "}
-          • Confidential Client Financial Information Form
+
+        <footer className="border-t border-slate-200 bg-white py-4 px-4 sm:px-6 text-center text-xs text-slate-400">
+          © 2026 JDI Wealth • Confidential Client Information
         </footer>
       </div>
     );
@@ -494,139 +164,297 @@ export default function ClientFinancialWizard() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between">
-      {/* Sticky Step Indicator & Header */}
-      <StepIndicator
-        currentStep={currentStep}
-        totalSteps={11}
-        completedSteps={completedSteps}
-        onStepClick={handleJumpToStep}
-        draftSavedTime={draftSavedTime}
-        onSaveDraft={handleSaveDraft}
-        onFillMockData={handleFillMockData}
-        financialSummary={financialSummary}
-      />
-
-      {/* Main Form Body (Clean Paper Sheet Layout) */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <form
-          onSubmit={handleSubmit(onSubmit, onValidationError)}
-          onKeyDown={(e) => {
-            // Prevent accidental submit when pressing Enter in input fields before step 11
-            if (e.key === "Enter" && e.target.tagName === "INPUT" && currentStep !== 11) {
-              e.preventDefault();
-            }
-          }}
-          noValidate
-        >
-          <div className="bg-white rounded-xl p-6 sm:p-8 border border-slate-200 shadow-xs">
-            {currentStep === 1 && (
-              <StepPersonal
-                register={register}
-                watch={watch}
-                setValue={setValue}
-                errors={errors}
-              />
-            )}
-
-            {currentStep === 2 && (
-              <StepFamily
-                familyMembers={familyMembers}
-                onAddMember={handleAddFamilyMember}
-                onRemoveMember={handleRemoveFamilyMember}
-                onUpdateMember={handleUpdateFamilyMember}
-              />
-            )}
-
-            {currentStep === 3 && (
-              <StepIncome
-                incomes={incomes}
-                onAddIncome={handleAddIncome}
-                onRemoveIncome={handleRemoveIncome}
-                onUpdateIncome={handleUpdateIncome}
-                errors={errors}
-              />
-            )}
-
-            {currentStep === 4 && (
-              <StepExpenses
-                register={register}
-                watch={watch}
-                incomes={incomes}
-                errors={errors}
-              />
-            )}
-
-            {currentStep === 5 && (
-              <StepAssets
-                assets={assets}
-                onAddAsset={handleAddAsset}
-                onRemoveAsset={handleRemoveAsset}
-                onUpdateAsset={handleUpdateAsset}
-              />
-            )}
-
-            {currentStep === 6 && (
-              <StepLiabilities
-                liabilities={liabilities}
-                assets={assets}
-                onAddLiability={handleAddLiability}
-                onRemoveLiability={handleRemoveLiability}
-                onUpdateLiability={handleUpdateLiability}
-              />
-            )}
-
-            {currentStep === 7 && (
-              <StepInvestments
-                investments={investments}
-                onAddInvestment={handleAddInvestment}
-                onRemoveInvestment={handleRemoveInvestment}
-                onUpdateInvestment={handleUpdateInvestment}
-              />
-            )}
-
-            {currentStep === 8 && (
-              <StepGoals
-                goals={goals}
-                onAddGoalWithPreset={handleAddGoalWithPreset}
-                onRemoveGoal={handleRemoveGoal}
-                onUpdateGoal={handleUpdateGoal}
-                errors={errors}
-              />
-            )}
-
-            {currentStep === 9 && (
-              <StepRetirement register={register} watch={watch} errors={errors} />
-            )}
-
-            {currentStep === 10 && (
-              <StepAdditional register={register} watch={watch} setValue={setValue} />
-            )}
-
-            {currentStep === 11 && (
-              <StepReview
-                formData={watchedValues}
-                onJumpToStep={handleJumpToStep}
-                register={register}
-                errors={errors}
-                isSubmitting={isSubmitting}
-              />
-            )}
+      {/* Brand Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <a
+              href="https://www.jdiwealth.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 group"
+            >
+              <div className="relative h-9 w-32 sm:w-36">
+                <Image
+                  src="/jdi-logo.png"
+                  alt="JDI Wealth"
+                  fill
+                  sizes="150px"
+                  className="object-contain object-left"
+                  priority
+                />
+              </div>
+            </a>
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+            <div className="hidden sm:block">
+              <h1
+                suppressHydrationWarning
+                className="text-sm font-semibold text-slate-800 leading-tight"
+              >
+                Client Information Form
+              </h1>
+              <p className="text-[11px] text-slate-400">Secure & Confidential</p>
+            </div>
           </div>
 
-          {/* Wizard Navigation Controls */}
-          <NavigationButtons
-            currentStep={currentStep}
-            totalSteps={11}
-            onBack={handleBack}
-            onNext={handleNext}
-            onSaveDraft={handleSaveDraft}
-            isSubmitting={isSubmitting}
-            isDraftSaving={isDraftSaving}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleFillSample}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              title="Populate form with sample personal details"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Fill Sample</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Personal Details Form */}
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div className="bg-white rounded-xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+            {/* Title & Description */}
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Personal Information</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Please enter your personal details below. Required fields are marked with{" "}
+                <span className="text-rose-500">*</span>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+              {/* Full Name */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rajesh Kumar"
+                  {...register("fullName")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.fullName
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.fullName && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.fullName.message}</p>
+                )}
+              </div>
+
+              {/* Date of Birth */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Date of Birth <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  {...register("dob")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.dob
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.dob && <p className="text-xs text-rose-600 mt-1">{errors.dob.message}</p>}
+              </div>
+
+              {/* Age */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Age (Years) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="18"
+                  max="100"
+                  placeholder="Auto-calculated from DOB"
+                  {...register("age")}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.age
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.age && <p className="text-xs text-rose-600 mt-1">{errors.age.message}</p>}
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Gender <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  {...register("gender")}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                {errors.gender && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.gender.message}</p>
+                )}
+              </div>
+
+              {/* Mobile Number */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Mobile Number <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 text-xs font-medium text-slate-500 bg-slate-100 border border-r-0 border-slate-300 rounded-l-lg">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="9876543210"
+                    {...register("mobile")}
+                    className={`w-full px-3.5 py-2.5 bg-white border rounded-r-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                      errors.mobile
+                        ? "border-rose-300 focus:border-rose-500"
+                        : "border-slate-300 focus:border-blue-500"
+                    }`}
+                  />
+                </div>
+                {errors.mobile && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.mobile.message}</p>
+                )}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="rajesh@example.com"
+                  {...register("email")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.email
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.email && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.email.message}</p>
+                )}
+              </div>
+
+              {/* Occupation */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Occupation <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Software Engineer / Business"
+                  {...register("occupation")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.occupation
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.occupation && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.occupation.message}</p>
+                )}
+              </div>
+
+              {/* Residential Address */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Residential Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="House/Flat No., Street, Locality"
+                  {...register("address")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.address
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.address && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.address.message}</p>
+                )}
+              </div>
+
+              {/* City */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  City <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mumbai"
+                  {...register("city")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.city
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.city && <p className="text-xs text-rose-600 mt-1">{errors.city.message}</p>}
+              </div>
+
+              {/* State */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  State <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Maharashtra"
+                  {...register("state")}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
+                    errors.state
+                      ? "border-rose-300 focus:border-rose-500"
+                      : "border-slate-300 focus:border-blue-500"
+                  }`}
+                />
+                {errors.state && (
+                  <p className="text-xs text-rose-600 mt-1">{errors.state.message}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Submit Action Bar */}
+            <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Your details are encrypted and kept strictly confidential.</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-xs cursor-pointer disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Submit Form</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </form>
       </main>
 
-      {/* Clean User Footer (No Admin Dashboard Button) */}
+      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
           <div>
@@ -640,7 +468,7 @@ export default function ClientFinancialWizard() {
               >
                 JDI Wealth
               </a>
-              . All client financial data is confidential & securely stored.
+              . All client information is confidential & securely stored.
             </span>
           </div>
 

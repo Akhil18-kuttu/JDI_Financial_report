@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -24,7 +24,10 @@ import {
   Calendar,
   Landmark,
   RefreshCw,
+  Share2,
+  Bell,
 } from "lucide-react";
+import ShareReportModal from "@/components/admin/ShareReportModal";
 import {
   getAllSubmissions,
   updateSubmissionStatus,
@@ -50,17 +53,65 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [shareTargetSubmission, setShareTargetSubmission] = useState(null);
+  const [newSubmissionAlert, setNewSubmissionAlert] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
-
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const refreshSubmissions = () => {
-    setSubmissions(getAllSubmissions());
+  // Ref to track known submissions and detect newly submitted records
+  const knownSubmissionsRef = useRef(null);
+
+  // Web Audio chime for non-intrusive alert
+  const playNotificationSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (_) {}
+  };
+
+  const triggerAlert = (record) => {
+    if (!record) return;
+    const alertData = {
+      submissionId: record.submissionId,
+      clientName: record.clientName || record.data?.fullName || "New Applicant",
+      time: new Date().toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+      record,
+    };
+    setNewSubmissionAlert(alertData);
+    playNotificationSound();
+  };
+
+  const refreshSubmissions = (isPeriodic = false) => {
+    const all = getAllSubmissions();
+    setSubmissions(all);
+
+    // If we have previous count and new submissions arrived
+    if (knownSubmissionsRef.current !== null && all.length > knownSubmissionsRef.current) {
+      const newest = all[0];
+      triggerAlert(newest);
+    }
+    knownSubmissionsRef.current = all.length;
   };
 
   const handleManualRefresh = () => {
     setIsRefreshing(true);
-    refreshSubmissions();
+    refreshSubmissions(false);
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -73,41 +124,52 @@ export default function AdminDashboardPage() {
     }
 
     setSession(userSession);
-    refreshSubmissions();
+    const initialSubmissions = getAllSubmissions();
+    setSubmissions(initialSubmissions);
+    knownSubmissionsRef.current = initialSubmissions.length;
     setIsLoaded(true);
 
     // 1. Cross-tab localStorage updates
     const handleStorage = (e) => {
       if (!e.key || e.key === "jdi_client_submissions") {
-        refreshSubmissions();
+        refreshSubmissions(true);
       }
     };
     window.addEventListener("storage", handleStorage);
 
     // 2. Window focus (when switching to the admin tab)
-    window.addEventListener("focus", refreshSubmissions);
+    window.addEventListener("focus", () => refreshSubmissions(true));
 
     // 3. In-tab custom submission event
-    window.addEventListener("jdi_new_submission", refreshSubmissions);
+    const handleNewSubmissionEvent = (e) => {
+      refreshSubmissions(true);
+      if (e.detail) {
+        triggerAlert(e.detail);
+      }
+    };
+    window.addEventListener("jdi_new_submission", handleNewSubmissionEvent);
 
     // 4. Cross-tab BroadcastChannel
     let channel = null;
     try {
       if (typeof BroadcastChannel !== "undefined") {
         channel = new BroadcastChannel("jdi_submissions_channel");
-        channel.onmessage = () => {
-          refreshSubmissions();
+        channel.onmessage = (msg) => {
+          refreshSubmissions(true);
+          if (msg.data?.type === "NEW_SUBMISSION" && msg.data?.record) {
+            triggerAlert(msg.data.record);
+          }
         };
       }
     } catch (_) {}
 
     // 5. Short periodic polling interval (every 2 seconds) for guaranteed zero-reload updates
-    const interval = setInterval(refreshSubmissions, 2000);
+    const interval = setInterval(() => refreshSubmissions(true), 2000);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("focus", refreshSubmissions);
-      window.removeEventListener("jdi_new_submission", refreshSubmissions);
+      window.removeEventListener("focus", () => refreshSubmissions(true));
+      window.removeEventListener("jdi_new_submission", handleNewSubmissionEvent);
       if (channel) channel.close();
       clearInterval(interval);
     };
@@ -209,6 +271,28 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
+            {/* Real-time Notification Bell */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (submissions.length > 0) {
+                    triggerAlert(submissions[0]);
+                  }
+                }}
+                className="relative p-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Submission Alert Status"
+              >
+                <Bell className="w-4 h-4" />
+                {newSubmissionAlert && (
+                  <>
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
+                  </>
+                )}
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={handleLogout}
@@ -224,6 +308,55 @@ export default function AdminDashboardPage() {
 
       {/* Main Dashboard Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Real-time New Submission Alert Message */}
+        {newSubmissionAlert && (
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-xl p-4 sm:p-5 shadow-lg border border-blue-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-blue-500/20 border border-blue-400 flex items-center justify-center shrink-0 text-amber-300 shadow-inner">
+                <Bell className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+                    New Submission Alert
+                  </span>
+                  <span className="text-xs text-blue-200">{newSubmissionAlert.time}</span>
+                </div>
+                <h3 className="text-sm font-bold text-white mt-1">
+                  <span className="text-amber-300 font-extrabold">{newSubmissionAlert.clientName}</span> has just submitted a new personal details form!
+                  <span className="font-mono text-xs text-blue-200 ml-2 font-normal">
+                    (Ref: {newSubmissionAlert.submissionId})
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Mobile: {newSubmissionAlert.record.mobile || "N/A"} • Email: {newSubmissionAlert.record.email || "N/A"} • Status: NEW
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSubmission(newSubmissionAlert.record);
+                  setNewSubmissionAlert(null);
+                }}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+              >
+                View Client Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewSubmissionAlert(null)}
+                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                title="Dismiss Alert"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Title & Quick Summary */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -234,11 +367,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2.5 self-start sm:self-auto">
-            {/* Live Sync Indicator */}
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Sync Active</span>
-            </div>
+
 
             {/* Manual Refresh Button */}
             <button
@@ -417,16 +546,28 @@ export default function AdminDashboardPage() {
                           </select>
                         </td>
 
-                        {/* Financial Report Column */}
+                        {/* Financial Report & Share Column */}
                         <td className="px-4 py-3 text-center">
-                          <a
-                            href={`/admin/report?id=${sub.submissionId}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors shadow-2xs"
-                            title="Generate Client Financial Planning Report"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>Generate Report</span>
-                          </a>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <a
+                              href={`/admin/report?id=${sub.submissionId}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors shadow-2xs"
+                              title="Generate / View Client Financial Planning Report"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Report</span>
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => setShareTargetSubmission(sub)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                              title="Share Report via WhatsApp or Email to this customer"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span>Share</span>
+                            </button>
+                          </div>
                         </td>
 
                         {/* Actions */}
@@ -507,6 +648,16 @@ export default function AdminDashboardPage() {
                   <FileText className="w-3.5 h-3.5" />
                   <span>Generate Report</span>
                 </a>
+
+                <button
+                  type="button"
+                  onClick={() => setShareTargetSubmission(selectedSubmission)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-colors shadow-xs cursor-pointer"
+                  title="Share Report via WhatsApp or Email"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Report</span>
+                </button>
 
                 <a
                   href={`/admin/edit?id=${selectedSubmission.submissionId}`}
@@ -714,7 +865,7 @@ export default function AdminDashboardPage() {
                           <span className="text-blue-700">{g.targetYear}</span>
                         </div>
                         <div className="text-slate-500 mt-1">
-                          Today's Cost: <strong>{formatINR(g.currentCost)}</strong> • Beneficiary:{" "}
+                          Today&apos;s Cost: <strong>{formatINR(g.currentCost)}</strong> • Beneficiary:{" "}
                           {g.beneficiary}
                         </div>
                       </div>
@@ -775,6 +926,18 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Share Report Modal (WhatsApp & Email) */}
+      <ShareReportModal
+        submission={shareTargetSubmission}
+        isOpen={!!shareTargetSubmission}
+        onClose={() => setShareTargetSubmission(null)}
+        onStatusChange={(newStatus) => {
+          if (shareTargetSubmission) {
+            handleStatusChange(shareTargetSubmission.submissionId, newStatus);
+          }
+        }}
+      />
     </div>
   );
 }

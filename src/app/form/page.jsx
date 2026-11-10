@@ -2,9 +2,8 @@ import { Suspense } from "react";
 import ClientFinancialWizard from "@/components/form/ClientFinancialWizard";
 
 export const metadata = {
-  title: "Client Financial Planning Form | JDI Wealth",
-  description:
-    "Confidential client financial planning form for personal, family, income, expenses, assets, liabilities, investments, and retirement modeling.",
+  title: "Client Information Form | JDI Wealth",
+  description: "Client personal details form.",
 };
 
 export default function FormPage() {

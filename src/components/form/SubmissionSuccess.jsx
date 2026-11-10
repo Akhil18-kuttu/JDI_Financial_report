@@ -33,11 +33,11 @@ export default function SubmissionSuccess({ submission, onStartNew }) {
         </div>
 
         <h1 className="text-2xl font-bold text-slate-900 mb-2">
-          Financial Information Submitted
+          Personal Details Submitted
         </h1>
 
         <p className="text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
-          Your financial information has been submitted successfully. Our financial planning team will review the information and contact you if additional details are required.
+          Your personal details have been submitted successfully. Our advisory team has received your information.
         </p>
 
         {/* Reference Details */}
@@ -54,22 +54,11 @@ export default function SubmissionSuccess({ submission, onStartNew }) {
             <span className="text-slate-500">Date & Time:</span>
             <span className="text-slate-700">{formatDate(submission.submittedAt)}</span>
           </div>
-          <div className="flex justify-between border-t border-slate-200 pt-2">
-            <span className="text-slate-500">Status:</span>
-            <span className="font-bold text-blue-700 uppercase">{submission.status || "NEW"}</span>
-          </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium border border-slate-300 rounded-lg transition-colors"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Summary</span>
-          </button>
+
           <button
             type="button"
             onClick={onStartNew}

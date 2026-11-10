@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ExternalLink,
   CheckCircle2,
+  Share2,
 } from "lucide-react";
 import {
   getSubmissionById,
@@ -20,6 +21,8 @@ import {
 } from "@/lib/services/formStorage";
 import { generateClientReportData } from "@/lib/utils/reportEngine";
 import { formatINR } from "@/lib/utils/formatters";
+import { directDownloadReportDocument } from "@/lib/utils/pdfExport";
+import ShareReportModal from "@/components/admin/ShareReportModal";
 
 function ReportContent() {
   const router = useRouter();
@@ -29,6 +32,8 @@ function ReportContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [submission, setSubmission] = useState(null);
   const [status, setStatus] = useState("NEW");
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Auth check and data load
   useEffect(() => {
@@ -72,6 +77,18 @@ function ReportContent() {
       handleStatusChange(SUBMISSION_STATUSES.REPORT_READY);
     }
     window.print();
+  };
+
+  const handleDirectDownload = () => {
+    setIsDownloading(true);
+    try {
+      if (status === SUBMISSION_STATUSES.NEW || status === SUBMISSION_STATUSES.UNDER_REVIEW) {
+        handleStatusChange(SUBMISSION_STATUSES.REPORT_READY);
+      }
+      directDownloadReportDocument(submission, "printable-report-content");
+    } finally {
+      setTimeout(() => setIsDownloading(false), 1200);
+    }
   };
 
   if (isLoading || !report) {
@@ -141,25 +158,36 @@ function ReportContent() {
             </select>
           </div>
 
-          {/* Print / Download Button */}
+          {/* Actions: Print, Direct Download, Share */}
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-            title="Print or Save as PDF"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+            title="Open browser print dialog (Save as PDF / Print)"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print Report</span>
+            <span>Print</span>
           </button>
 
           <button
             type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-            title="Download PDF via browser print"
+            onClick={handleDirectDownload}
+            disabled={isDownloading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+            title="Directly download PDF report document to your device"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Download PDF</span>
+            <span>{isDownloading ? "Downloading..." : "Download PDF"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsShareOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+            title="Share report via WhatsApp or Email"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share Report</span>
           </button>
         </div>
       </div>
@@ -167,7 +195,10 @@ function ReportContent() {
       {/* ========================================================================= */}
       {/* PRINTABLE REPORT DOCUMENT (Exact Replica of Sample PDF) */}
       {/* ========================================================================= */}
-      <div className="max-w-[850px] mx-auto bg-white p-6 sm:p-8 print:p-0 shadow-md print:shadow-none border border-slate-300 print:border-none">
+      <div
+        id="printable-report-content"
+        className="max-w-[850px] mx-auto bg-white p-6 sm:p-8 print:p-0 shadow-md print:shadow-none border border-slate-300 print:border-none"
+      >
         
         {/* ======================== PAGE 1 ======================== */}
         <section className="print:min-h-screen">
@@ -995,6 +1026,14 @@ function ReportContent() {
           </div>
         </section>
       </div>
+
+      {/* Share Report Modal (WhatsApp & Email) */}
+      <ShareReportModal
+        submission={submission}
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   );
 }
