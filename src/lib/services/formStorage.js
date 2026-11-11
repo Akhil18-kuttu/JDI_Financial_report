@@ -214,6 +214,59 @@ export function getAllSubmissions() {
 }
 
 /**
+ * Creates a brand new client submission directly by Admin
+ * @param {object} formData
+ * @param {string} status
+ * @returns {object} newly created submission record
+ */
+export function createAdminSubmission(formData, status = SUBMISSION_STATUSES.NEW) {
+  if (typeof window === "undefined") return null;
+  try {
+    const submissionId = `JDI-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const submissionRecord = {
+      submissionId,
+      clientName: formData.fullName || "Valued Client",
+      email: formData.email || "",
+      mobile: formData.mobile || "",
+      submittedAt: new Date().toISOString(),
+      status: status || SUBMISSION_STATUSES.NEW,
+      createdByAdmin: true,
+      lastModifiedByAdmin: new Date().toISOString(),
+      statusHistory: [
+        {
+          status: status || SUBMISSION_STATUSES.NEW,
+          timestamp: new Date().toISOString(),
+          note: "Client profile created directly by administrator.",
+        },
+      ],
+      data: formData,
+    };
+
+    const existingJson = localStorage.getItem(STORAGE_KEYS.SUBMISSIONS);
+    const submissions = existingJson ? JSON.parse(existingJson) : [];
+    submissions.unshift(submissionRecord);
+    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(submissions));
+
+    // Real-time broadcast to all tabs and windows
+    try {
+      window.dispatchEvent(
+        new CustomEvent("jdi_new_submission", { detail: submissionRecord })
+      );
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("jdi_submissions_channel");
+        channel.postMessage({ type: "NEW_SUBMISSION", record: submissionRecord });
+        channel.close();
+      }
+    } catch (_) {}
+
+    return submissionRecord;
+  } catch (err) {
+    console.error("Failed to create admin submission:", err);
+    throw new Error("Unable to create client profile. Please try again.");
+  }
+}
+
+/**
  * Retrieves a single submission by ID
  * @param {string} submissionId
  * @returns {object|null}

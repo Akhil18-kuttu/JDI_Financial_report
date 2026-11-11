@@ -26,6 +26,8 @@ import {
   RefreshCw,
   Share2,
   Bell,
+  UserPlus,
+  Plus,
 } from "lucide-react";
 import ShareReportModal from "@/components/admin/ShareReportModal";
 import {
@@ -227,7 +229,7 @@ export default function AdminDashboardPage() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col w-full max-w-[100vw] overflow-x-hidden">
       {/* Top Admin Navbar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
@@ -366,9 +368,7 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start sm:self-auto">
-
-
+          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
             {/* Manual Refresh Button */}
             <button
               type="button"
@@ -380,12 +380,23 @@ export default function AdminDashboardPage() {
               <span>Refresh</span>
             </button>
 
+            {/* Admin Direct Add Client Button */}
+            <a
+              href="/admin/edit?id=new"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+              title="Create new client financial portfolio from scratch"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ Add New Client</span>
+            </a>
+
             <a
               href="/form"
               target="_blank"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
             >
-              <span>+ Submit New Form</span>
+              <span className="hidden sm:inline">Open Client Form</span>
+              <span className="sm:hidden">Client Form</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -447,17 +458,24 @@ export default function AdminDashboardPage() {
         {/* Submissions Table */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
           {filteredSubmissions.length === 0 ? (
-            <div className="py-16 text-center text-slate-500 space-y-2">
+            <div className="py-16 text-center text-slate-500 space-y-3 px-4">
               <FileText className="w-10 h-10 text-slate-300 mx-auto" />
               <p className="font-semibold text-slate-700 text-sm">No Client Submissions Found</p>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Open the client form, enter details (or click <strong>Fill Mock Data</strong>) and click submit. It will immediately show up here.
+                Add a new client profile directly as an administrator, or open the client form to enter details.
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
+                <a
+                  href="/admin/edit?id=new"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 shadow-xs transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Add New Client</span>
+                </a>
                 <a
                   href="/form"
                   target="_blank"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 shadow-xs transition-colors"
                 >
                   <span>Go to Client Form (/form)</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -465,8 +483,8 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs text-slate-600 min-w-[860px]">
                 <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="px-4 py-3">ID & Date</th>

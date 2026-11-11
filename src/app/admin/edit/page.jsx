@@ -21,13 +21,19 @@ import {
   Shield,
   AlertCircle,
   TrendingUp,
+  Sparkles,
+  RotateCcw,
+  UserPlus,
+  FileText,
 } from "lucide-react";
 import {
   getSubmissionById,
   updateSubmissionData,
+  createAdminSubmission,
   getAdminSession,
   SUBMISSION_STATUSES,
 } from "@/lib/services/formStorage";
+import { sampleClientData } from "@/lib/services/mockData";
 import { formatINR, formatDate, calculateAgeFromDOB } from "@/lib/utils/formatters";
 import {
   calculateTotalMonthlyIncome,
@@ -53,6 +59,56 @@ const SECTIONS = [
   { id: "additional", label: "10. Protection & Notes", icon: Shield },
 ];
 
+const blankClientData = {
+  fullName: "",
+  dob: "",
+  age: "",
+  gender: "Male",
+  mobile: "",
+  email: "",
+  occupation: "",
+  address: "",
+  city: "",
+  state: "",
+  familyMembers: [],
+  incomes: [
+    {
+      id: "inc-1",
+      type: "Salary",
+      frequency: "monthly",
+      amount: "",
+      description: "Primary employment income",
+    },
+  ],
+  expenses: {
+    household: "",
+    education: "",
+    medical: "",
+    rent: "",
+    loanEMI: "",
+    insurance: "",
+    travel: "",
+    other: "",
+  },
+  assets: [],
+  liabilities: [],
+  investments: [],
+  goals: [],
+  currentAge: "",
+  retirementAge: 60,
+  currentRetirementSavings: "",
+  desiredMonthlyIncome: "",
+  existingPension: "",
+  expectedPensionIncrease: 5,
+  lifeExpectancy: 85,
+  otherRetirementNotes: "",
+  lifeInsuranceCover: "",
+  healthInsuranceCover: "",
+  hasWill: false,
+  hasEmergencyFund: false,
+  plannerNotes: "",
+};
+
 function AdminEditContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,7 +122,7 @@ function AdminEditContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Authentication check
+  // Authentication check & Data initialization
   useEffect(() => {
     const session = getAdminSession();
     if (!session) {
@@ -76,6 +132,20 @@ function AdminEditContent() {
 
     if (!submissionId) {
       router.replace("/admin");
+      return;
+    }
+
+    // NEW CLIENT MODE: admin is adding client from scratch
+    if (submissionId === "new") {
+      setSubmission({
+        submissionId: "NEW CLIENT",
+        clientName: "New Client Profile",
+        status: SUBMISSION_STATUSES.NEW,
+        isNew: true,
+      });
+      setFormData(JSON.parse(JSON.stringify(blankClientData)));
+      setStatus(SUBMISSION_STATUSES.NEW);
+      setIsLoading(false);
       return;
     }
 
@@ -261,17 +331,51 @@ function AdminEditContent() {
     setFormData((prev) => ({ ...prev, goals: list }));
   };
 
-  // Save changes
+  // Pre-fill full realistic sample data
+  const handleFillSample = () => {
+    if (confirm("Pre-fill complete realistic sample financial profile data into all fields?")) {
+      setFormData(JSON.parse(JSON.stringify(sampleClientData)));
+    }
+  };
+
+  // Clear to clean blank template
+  const handleClearBlank = () => {
+    if (confirm("Clear all fields back to blank?")) {
+      setFormData(JSON.parse(JSON.stringify(blankClientData)));
+    }
+  };
+
+  // Save changes or create new client
   const handleSave = () => {
+    if (!formData.fullName || formData.fullName.trim() === "") {
+      alert("Please provide the Client Full Name in Section 1 (Personal) before saving.");
+      setActiveTab("personal");
+      return;
+    }
+
     setIsSaving(true);
     setTimeout(() => {
-      const success = updateSubmissionData(submissionId, formData, status);
-      setIsSaving(false);
-      if (success) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+      if (submission?.isNew || submissionId === "new") {
+        try {
+          const created = createAdminSubmission(formData, status);
+          setIsSaving(false);
+          setSaveSuccess(true);
+          setTimeout(() => {
+            router.push(`/admin/report?id=${created.submissionId}`);
+          }, 900);
+        } catch (e) {
+          setIsSaving(false);
+          alert("Failed to create client profile: " + e.message);
+        }
       } else {
-        alert("Failed to save changes.");
+        const success = updateSubmissionData(submissionId, formData, status);
+        setIsSaving(false);
+        if (success) {
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+        } else {
+          alert("Failed to save changes.");
+        }
       }
     }, 400);
   };
@@ -285,15 +389,15 @@ function AdminEditContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col w-full max-w-[100vw] overflow-x-hidden">
       {/* Sticky Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => router.push("/admin")}
-              className="p-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-600 transition-colors"
+              className="p-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
               title="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -303,23 +407,57 @@ function AdminEditContent() {
             </div>
             <div className="h-4 w-px bg-slate-200 hidden sm:block" />
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-blue-700">{submission.submissionId}</span>
-                <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs font-bold text-slate-800">{formData.fullName || "Client"}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {submission.isNew ? (
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    + NEW CLIENT PROFILE
+                  </span>
+                ) : (
+                  <span className="font-mono text-xs font-bold text-blue-700">{submission.submissionId}</span>
+                )}
+                <span className="text-xs text-slate-400 hidden xs:inline">•</span>
+                <span className="text-xs font-bold text-slate-800 truncate max-w-[180px] sm:max-w-none">
+                  {formData.fullName || (submission.isNew ? "Enter Client Name" : "Client")}
+                </span>
               </div>
-              <p className="text-[11px] text-slate-500">Administrator Full Data Editor</p>
+              <p className="text-[11px] text-slate-500">
+                {submission.isNew ? "Create Comprehensive Client Portfolio" : "Administrator Full Data Editor"}
+              </p>
             </div>
           </div>
 
-          {/* Status selector & Save button */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs">
+          {/* Status selector & Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {submission.isNew && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleFillSample}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  title="Populate complete sample data for fast testing"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="hidden sm:inline">Fill Sample Data</span>
+                  <span className="sm:hidden">Sample</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearBlank}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                  title="Reset form back to blank"
+                >
+                  <RotateCcw className="w-3 h-3 text-slate-500" />
+                  <span className="hidden sm:inline">Clear</span>
+                </button>
+              </>
+            )}
+
+            <div className="flex items-center gap-1 text-xs">
               <span className="text-slate-500 hidden md:inline">Status:</span>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:outline-none focus:border-blue-500"
+                className="px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:outline-none focus:border-blue-500"
               >
                 {Object.values(SUBMISSION_STATUSES).map((st) => (
                   <option key={st} value={st}>
@@ -333,17 +471,17 @@ function AdminEditContent() {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-60"
             >
-              <Save className="w-4 h-4" />
-              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+              {submission.isNew ? <UserPlus className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? "Saving..." : submission.isNew ? "Create & Save Client" : "Save Changes"}</span>
             </button>
           </div>
         </div>
 
         {/* Live Calculation Bar */}
         <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 lg:px-8 py-2">
-          <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto text-xs gap-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto text-xs gap-4 scrollbar-thin pb-1 sm:pb-0">
             <div className="flex items-center gap-4 min-w-max text-slate-600">
               <div>
                 Income: <strong className="text-slate-900">{formatINR(calculated.monthlyIncome)}/mo</strong>
@@ -366,9 +504,9 @@ function AdminEditContent() {
             </div>
 
             {saveSuccess && (
-              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 text-[11px] shrink-0">
+              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 text-[11px] shrink-0 animate-in fade-in">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>All changes saved successfully!</span>
+                <span>{submission.isNew ? "Client Profile Created! Redirecting to report..." : "All changes saved successfully!"}</span>
               </span>
             )}
           </div>
@@ -376,32 +514,34 @@ function AdminEditContent() {
       </header>
 
       {/* Editor Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
-        {/* Navigation Tabs (Sidebar on desktop) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col md:flex-row gap-4 sm:gap-6">
+        {/* Navigation Tabs (Horizontal scroll on mobile, sticky sidebar on desktop) */}
         <aside className="w-full md:w-56 shrink-0">
-          <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 sticky top-28">
-            <span className="block px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="bg-white border border-slate-200 rounded-xl p-2 sticky top-24 z-20 shadow-xs">
+            <span className="hidden md:block px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Sections to Edit
             </span>
-            {SECTIONS.map((sec) => {
-              const Icon = sec.icon;
-              const isActive = activeTab === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  type="button"
-                  onClick={() => setActiveTab(sec.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-left transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{sec.label}</span>
-                </button>
-              );
-            })}
+            <div className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1.5 pb-1 md:pb-0 scrollbar-none">
+              {SECTIONS.map((sec) => {
+                const Icon = sec.icon;
+                const isActive = activeTab === sec.id;
+                return (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    onClick={() => setActiveTab(sec.id)}
+                    className={`shrink-0 md:w-full whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg text-left transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-blue-600 text-white font-bold shadow-xs md:bg-blue-50 md:text-blue-700 md:border md:border-blue-200"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 md:bg-transparent"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{sec.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </aside>
 
@@ -1165,23 +1305,24 @@ function AdminEditContent() {
           )}
 
           {/* Bottom Save Bar */}
-          <div className="pt-6 border-t border-slate-200 flex items-center justify-between">
+          <div className="pt-6 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
             <button
               type="button"
               onClick={() => router.push("/admin")}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors cursor-pointer text-center"
             >
-              Cancel & Return to Dashboard
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+              <span>Cancel & Return to Dashboard</span>
             </button>
 
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-60 text-center"
             >
-              <Save className="w-4 h-4" />
-              <span>{isSaving ? "Saving..." : "Save All Changes"}</span>
+              {submission?.isNew ? <UserPlus className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? "Saving..." : submission?.isNew ? "Create & Save Client" : "Save All Changes"}</span>
             </button>
           </div>
         </div>

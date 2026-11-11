@@ -130,85 +130,83 @@ function ReportContent() {
   const cashFlowPage2 = cashFlowStatement.slice(10);
 
   return (
-    <div className="min-h-screen bg-slate-200 py-6 print:py-0 print:bg-white text-slate-900 font-sans text-xs">
-      {/* SCREEN-ONLY TOOLBAR */}
-      <div className="max-w-[850px] mx-auto mb-4 px-4 sm:px-0 print:hidden flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-300 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/admin")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Admin Dashboard</span>
-          </button>
-          <div>
-            <span className="font-mono text-xs font-bold text-blue-700">
-              {submission.submissionId}
-            </span>
-            <span className="text-slate-400 mx-1.5">•</span>
-            <span className="font-semibold text-slate-800">{clientProfile.name}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Status selector */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-slate-500 font-medium">Status:</span>
-            <select
-              value={status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 focus:outline-none"
+    <div className="min-h-screen bg-slate-100 print:bg-white text-slate-900 font-sans text-xs w-full max-w-[100vw] overflow-x-hidden print:overflow-visible">
+      {/* SCREEN-ONLY TOP NAVIGATION BAR */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-xs print:hidden w-full">
+        <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          {/* Top / Left Section: Back Button (Arrow Only) & Client Info */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => router.push("/admin")}
+              className="p-1.5 sm:p-2 text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer shrink-0"
+              title="Back to Admin Dashboard"
             >
-              {Object.values(SUBMISSION_STATUSES).map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            <div className="h-4 w-px bg-slate-200 shrink-0" />
+
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono text-[11px] sm:text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+                {submission.submissionId}
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">
+                {clientProfile.name}
+              </span>
+            </div>
           </div>
 
-          {/* Actions: Print, Direct Download, Share */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-            title="Open browser print dialog (Save as PDF / Print)"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print</span>
-          </button>
+          {/* Bottom / Right Section: Action Buttons (Print, Download, Share) */}
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto shrink-0">
+            {/* Print Button */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+              title="Open browser print dialog (Save as PDF / Print)"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleDirectDownload}
-            disabled={isDownloading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-            title="Directly download PDF report document to your device"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{isDownloading ? "Downloading..." : "Download PDF"}</span>
-          </button>
+            {/* Download PDF Button */}
+            <button
+              type="button"
+              onClick={handleDirectDownload}
+              disabled={isDownloading}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer whitespace-nowrap disabled:opacity-60"
+              title="Download PDF report document directly to device"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isDownloading ? "Downloading..." : "Download"}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setIsShareOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-            title="Share report via WhatsApp or Email"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share Report</span>
-          </button>
+            {/* Share Report Button */}
+            <button
+              type="button"
+              onClick={() => setIsShareOpen(true)}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+              title="Share report via WhatsApp or Email"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* ========================================================================= */}
-      {/* PRINTABLE REPORT DOCUMENT (Exact Replica of Sample PDF) */}
-      {/* ========================================================================= */}
-      <div
-        id="printable-report-content"
-        className="max-w-[850px] mx-auto bg-white p-6 sm:p-8 print:p-0 shadow-md print:shadow-none border border-slate-300 print:border-none"
-      >
+      {/* REPORT CONTENT WRAPPER */}
+      <main className="py-4 sm:py-6">
+        
+
+        {/* Responsive Horizontal Scroll Container for Mobile / Tablets */}
+        <div className="w-full overflow-x-auto print:overflow-visible px-2 sm:px-4 pb-6 print:px-0 print:pb-0 scrollbar-thin">
+          <div
+            id="printable-report-content"
+            className="w-[850px] mx-auto bg-white p-6 sm:p-8 print:p-0 print:w-full shadow-md print:shadow-none border border-slate-300 print:border-none shrink-0"
+          >
         
         {/* ======================== PAGE 1 ======================== */}
         <section className="print:min-h-screen">
@@ -1036,6 +1034,8 @@ function ReportContent() {
           </div>
         </section>
       </div>
+    </div>
+  </main>
 
       {/* Share Report Modal (WhatsApp & Email) */}
       <ShareReportModal
