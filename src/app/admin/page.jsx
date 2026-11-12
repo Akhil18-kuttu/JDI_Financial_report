@@ -362,9 +362,9 @@ export default function AdminDashboardPage() {
         {/* Page Title & Quick Summary */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Client Submissions Dashboard</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Client Portfolio & Planning Dashboard</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Review, verify, and update the status of client financial planning records.
+              Manage client financial profiles, track goals, and generate advisory reports.
             </p>
           </div>
 
@@ -460,7 +460,7 @@ export default function AdminDashboardPage() {
           {filteredSubmissions.length === 0 ? (
             <div className="py-16 text-center text-slate-500 space-y-3 px-4">
               <FileText className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="font-semibold text-slate-700 text-sm">No Client Submissions Found</p>
+              <p className="font-semibold text-slate-700 text-sm">No Client Profiles Found</p>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
                 Add a new client profile directly as an administrator, or open the client form to enter details.
               </p>

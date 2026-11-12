@@ -218,9 +218,9 @@ export default function ClientFinancialWizard() {
             {/* Title & Description */}
             <div>
               <h2 className="text-xl font-bold text-slate-900">Personal Information</h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Please enter your personal details below. Required fields are marked with{" "}
-                <span className="text-rose-500">*</span>.
+              <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                Please provide your details below to help us design your personalized financial plan. All information is kept strictly confidential and secure. Required fields are marked with{" "}
+                <span className="text-rose-500 font-semibold">*</span>.
               </p>
             </div>
 
@@ -271,7 +271,7 @@ export default function ClientFinancialWizard() {
                   type="number"
                   min="18"
                   max="100"
-                  placeholder="Auto-calculated from DOB"
+                  placeholder="DOB"
                   {...register("age")}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 ${
                     errors.age

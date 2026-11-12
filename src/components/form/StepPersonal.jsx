@@ -21,9 +21,9 @@ export default function StepPersonal({ register, watch, setValue, errors }) {
       {/* Title & Description */}
       <div>
         <h2 className="text-xl font-bold text-slate-900">Personal Information</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Please enter your contact details. Required fields are marked with{" "}
-          <span className="text-rose-500">*</span>.
+        <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+          Please provide your details below to help us design your personalized financial plan. All information is kept strictly confidential and secure. Required fields are marked with{" "}
+          <span className="text-rose-500 font-semibold">*</span>.
         </p>
       </div>
 
